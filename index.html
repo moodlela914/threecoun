@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三國諺語配對遊戲</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Serif TC', serif;
+            background-color: #FDF6E3; /* 古籍宣紙顏色 */
+            background-image: url('https://www.transparenttextures.com/patterns/rice-paper-3.png');
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 卷軸風格容器 */
+        .scroll-container {
+            background-color: #F5EFE6; /* 卷軸內頁顏色 */
+            border: 15px solid #6B4F4F; /* 深木色邊框 */
+            border-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48ZGVmcz48cGF0dGVybiBpZD0icGF0dGVybiIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiPjxsaW5lYXJHcmFkaWVudCBpZD0iZ3JhZGllbnQiIGdyYWRpZW50VHJhbnNmb3JtPSJyb3RhdGUoNDUpIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjOGQ2ZTYzIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjNWQ0MDM3Ii8+PC9saW5lYXJHcmFkaWVudD48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0idXJsKCNncmFkaWVudCkiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI3BhdHRlcm4pIi8+PC9zdmc+) 15 round;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3), inset 0 0 10px rgba(0,0,0,0.2);
+            position: relative;
+        }
+
+        .scroll-container::before, .scroll-container::after {
+            content: '';
+            position: absolute;
+            height: 100%;
+            width: 30px; /* 卷軸軸心寬度 */
+            background: #A47551; /* 卷軸木頭顏色 */
+            top: 0;
+            border-radius: 5px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.4);
+        }
+        .scroll-container::before { left: -35px; }
+        .scroll-container::after { right: -35px; }
+
+        .proverb-box, .character-card {
+            border: 3px solid #8D7B68;
+            transition: all 0.3s ease;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+        }
+
+        /* 拖曳中的卡片樣式 */
+        .dragging {
+            opacity: 0.5;
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 15px 25px rgba(0,0,0,0.3);
+            cursor: grabbing;
+        }
+
+        /* 答對的樣式 */
+        .correct {
+            border-color: #16a34a !important; /* Green */
+            background-color: #f0fdf4 !important;
+            box-shadow: 0 0 15px #16a34a;
+        }
+        
+        /* 錯誤配對的晃動效果 */
+        .incorrect-shake {
+            animation: shake 0.5s ease-in-out;
+            border-color: #dc2626 !important; /* Red */
+        }
+        
+        /* 燈箱顯示/隱藏的動畫 */
+        .modal-hidden { display: none; }
+        .modal-visible { display: flex; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+            20%, 40%, 60%, 80% { transform: translateX(8px); }
+        }
+
+        /* 水墨風格標題 */
+        .ink-title {
+            color: #3C2317;
+            text-shadow: 1px 1px 0px #BFB29E, 2px 2px 0px #BFB29E;
+        }
+
+        @media (max-width: 768px) {
+            .scroll-container {
+                border-width: 10px;
+                padding: 1rem;
+            }
+            .scroll-container::before, .scroll-container::after {
+                width: 15px;
+            }
+            .scroll-container::before { left: -20px; }
+            .scroll-container::after { right: -20px; }
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="game-container" class="scroll-container w-full max-w-5xl p-8 md:p-12 rounded-lg relative">
+        <div id="game-area" class="flex flex-col gap-8">
+             <!-- 標題 -->
+            <div class="text-center">
+                <h1 class="ink-title text-3xl md:text-5xl font-bold tracking-widest">三國諺語配對</h1>
+            </div>
+            <div id="main-content" class="w-full hidden">
+                <!-- 標頭：計分板 -->
+                <header class="mb-6 flex justify-between items-center bg-black/5 p-4 rounded-lg">
+                    <h2 class="text-2xl font-bold text-[#6B4F4F]">諺語配對</h2>
+                    <div id="score-board" class="text-xl font-bold text-white bg-[#A47551] px-4 py-2 rounded-md shadow-inner">
+                        分數：<span id="score">0</span>
+                    </div>
+                </header>
+
+                <main>
+                    <!-- 上方：題目區 (諺語) -->
+                    <div id="proverb-container" class="flex justify-center items-center gap-4 md:gap-6 min-h-[150px] mb-8 p-4 bg-black/5 rounded-lg">
+                        <!-- 諺語方框會由 JavaScript 動態生成 -->
+                    </div>
+
+                    <!-- 下方：選項區 (人物) -->
+                    <div id="character-container" class="flex flex-wrap justify-center items-center gap-4 min-h-[100px] p-4 bg-black/5 rounded-lg border-t-4 border-dashed border-[#8D7B68]">
+                        <!-- 人物卡片會由 JavaScript 動態生成 -->
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 遊戲開始彈出視窗 -->
+    <div id="start-game-modal" class="modal-visible fixed inset-0 bg-black/60 flex justify-center items-center z-50">
+        <div class="bg-[#F5EFE6] p-10 rounded-lg shadow-2xl text-center border-4 border-[#6B4F4F] w-11/12 max-w-md">
+            <h2 class="text-3xl font-bold mb-6 text-[#3C2317]">三國諺語配對</h2>
+            <div class="space-y-4">
+                <input id="start-player-name" type="text" placeholder="請在此輸入你的大名" class="w-full p-3 border-2 border-[#8D7B68] rounded-md bg-white text-center text-lg">
+                <button id="start-game-button" class="w-full bg-[#6B4F4F] text-white px-8 py-3 rounded-md text-lg font-bold hover:bg-[#3C2317] transition-colors shadow-lg">開始挑戰</button>
+                <p id="start-status" class="text-sm text-red-600 h-4"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 典故燈箱 -->
+    <div id="allusion-modal" class="modal-hidden fixed inset-0 bg-black/70 justify-center items-center z-50 p-4">
+        <div class="bg-[#F5EFE6] p-8 rounded-lg shadow-2xl border-4 border-[#6B4F4F] w-full max-w-lg relative">
+            <h3 id="allusion-title" class="text-2xl font-bold mb-2 text-[#3C2317]"></h3>
+            <p id="allusion-result" class="text-lg mb-4 font-bold"></p>
+            <div class="bg-white/50 p-4 rounded border border-[#C6BBAE] mb-6">
+                <h4 class="font-bold text-lg text-left text-[#6B4F4F] mb-2">典故：</h4>
+                <p id="allusion-text" class="text-left text-gray-800 max-h-48 overflow-y-auto"></p>
+            </div>
+            <button id="next-question-button" class="w-full bg-[#A47551] text-white px-8 py-3 rounded-md text-lg font-bold hover:bg-[#8D7B68] transition-colors shadow-lg">
+                下一題
+            </button>
+        </div>
+    </div>
+
+    <!-- 遊戲結束彈出視窗 -->
+    <div id="end-game-modal" class="modal-hidden fixed inset-0 bg-black/60 justify-center items-center z-50">
+        <div class="bg-[#F5EFE6] p-10 rounded-lg shadow-2xl text-center border-4 border-[#6B4F4F] w-11/12 max-w-md">
+            <h2 class="text-3xl font-bold mb-4 text-[#3C2317]">挑戰完成！</h2>
+            <p class="text-xl mb-6 text-[#6B4F4F]">你的最終分數是：<span id="final-score" class="font-bold text-2xl">0</span></p>
+            <div class="space-y-4 mb-6">
+                <input id="player-name" type="text" placeholder="請輸入你的名字" class="w-full p-3 border-2 border-[#8D7B68] rounded-md bg-white text-center">
+                <button id="save-score-button" class="w-full bg-[#6B4F4F] text-white px-8 py-3 rounded-md text-lg font-bold hover:bg-[#3C2317] transition-colors shadow-lg">儲存成績</button>
+                <p id="save-status" class="text-sm text-gray-500 h-4"></p>
+            </div>
+            <button id="restart-button" class="w-full bg-[#A47551] text-white px-8 py-3 rounded-md text-lg font-bold hover:bg-[#8D7B68] transition-colors shadow-lg">重新挑戰</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const APPS_SCRIPT_URL = 'YOUR_WEB_APP_URL_HERE'; 
+            
+            const idiomData = [
+                { proverb: '單刀赴會', character: '關羽', allusion: '魯肅邀請關羽赴宴意圖索回荊州，關羽僅帶數人持刀赴會，席間與魯肅論理，最終平安返回，展現其智勇雙全。' },
+                { proverb: '三顧茅廬', character: '劉備', allusion: '劉備為請諸葛亮出山相助，三次親自到其隱居的茅廬拜訪，最終以誠意打動諸葛亮，成為千古佳話。' },
+                { proverb: '七擒七縱', character: '諸葛亮', allusion: '諸葛亮為平定南方孟獲的叛亂，七次將其俘虜又七次釋放，使其心悅誠服，最終歸順蜀漢，穩定後方。' },
+                { proverb: '望梅止渴', character: '曹操', allusion: '曹操率軍行經乾旱之地，士兵們口渴難耐。曹操便說前方有大片梅林，梅子酸甜可口，士兵聽後口中生津，精神大振而加快行軍。' },
+                { proverb: '萬事俱備，只欠東風', character: '周瑜', allusion: '赤壁之戰前，周瑜設計火攻曹軍，一切準備就緒，唯獨缺少冬天罕見的東南風。後諸葛亮設壇作法借來東風，火攻才得以成功。' },
+                { proverb: '一身是膽', character: '趙雲', allusion: '趙雲在長坂坡單騎救主，懷抱幼主劉禪，於曹操萬軍中七進七出，斬殺多名敵將，劉備讚其「一身是膽」。' },
+                { proverb: '樂不思蜀', character: '劉禪', allusion: '蜀漢滅亡後，後主劉禪被俘至魏國，司馬昭問他是否思念蜀國，他卻回答「此間樂，不思蜀」，比喻樂而忘返或樂而忘本。' },
+                { proverb: '刮骨療傷', character: '關羽', allusion: '關羽手臂中毒箭，華佗為其剖開手臂刮骨去毒。過程中關羽飲酒下棋，面不改色，展現其驚人毅力。' },
+                { proverb: '如魚得水', character: '劉備', allusion: '劉備得到諸葛亮輔佐後，對關羽、張飛說：「我得到孔明，就像魚得到了水一樣。」比喻得到與自己情投意合的人或適合的環境。' },
+                { proverb: '空城計', character: '諸葛亮', allusion: '諸葛亮因錯用馬謖而失守街亭，魏軍大兵壓境，城中已無兵防守。他便大開城門，自己在城樓上撫琴，司馬懿疑有埋伏而退兵。' },
+                { proverb: '說曹操，曹操到', character: '曹操', allusion: '漢獻帝遭李傕、郭汜追擊時，有人建議找曹操護駕，話音剛落，曹操的軍隊就出現並解救了獻帝。形容人或事物來得非常及時。' },
+                { proverb: '草船借箭', character: '諸葛亮', allusion: '周瑜要求諸葛亮十天造十萬支箭，諸葛亮卻說三天即可。他利用大霧天氣，派草船駛向曹營，誘使曹軍射箭，輕鬆得箭十萬餘支。' },
+                { proverb: '桃園三結義', character: '劉備', allusion: '東漢末年，劉備、關羽和張飛在桃園中對天盟誓，結為異姓兄弟，此為小說中著名的情節。' },
+                { proverb: '敗走麥城', character: '關羽', allusion: '關羽因驕傲輕敵，被東吳呂蒙設計奪取荊州，自己則兵敗被困於麥城，最終突圍失敗被俘身亡，是其英雄生涯的悲劇終點。' },
+                { proverb: '過五關斬六將', character: '關羽', allusion: '關羽為護送劉備的兩位夫人，從曹營出發尋找劉備。沿途經過五個關隘，斬殺了六名阻擋他的曹軍將領。' },
+                { proverb: '火燒連環船', character: '周瑜', allusion: '赤壁之戰時，曹軍將戰船用鐵索相連以抗風浪。周瑜利用此點，派黃蓋詐降，並用火船衝擊曹軍船陣，大獲全勝。' },
+                { proverb: '轅門射戟', character: '呂布', allusion: '袁術派大將紀靈攻打劉備，呂布為雙方調解，在營門立一支戟，約定若能一箭射中戟上的小枝，雙方就罷兵，結果一箭命中。' },
+                { proverb: '三英戰呂布', character: '呂布', allusion: '虎牢關前，呂布驍勇無敵，張飛、關羽、劉備三人輪番上陣與其對戰，才勉強將其擊退，展現了呂布的驚人武力。' },
+                { proverb: '橫槊賦詩', character: '曹操', allusion: '赤壁之戰前夕，曹操在船上設宴，意氣風發，橫持長矛，吟誦出著名詩篇《短歌行》，抒發其統一天下的雄心壯志。' },
+                { proverb: '怒鞭督郵', character: '張飛', allusion: '朝廷派督郵到縣裡巡查，他向劉備索取賄賂不成，便誣陷劉備。張飛大怒，將督郵綁在樹上痛打一頓。' },
+                { proverb: '大意失荊州', character: '關羽', allusion: '關羽鎮守荊州時，出兵攻打樊城，卻因驕傲自滿，疏於防範，導致東吳呂蒙白衣渡江，偷襲成功，最終失守荊州。' },
+                { proverb: '舌戰群儒', character: '諸葛亮', allusion: '諸葛亮為促成孫劉聯盟，獨自前往東吳，面對張昭等一群東吳謀士的詰難，他憑藉自己的才智和辯才，一一駁倒對方，最終說服孫權。' },
+                { proverb: '白帝城托孤', character: '劉備', allusion: '劉備在夷陵之戰大敗後病危，於白帝城將兒子劉禪托付給諸葛亮，並說若劉禪無能，諸葛亮可取而代之。' },
+                { proverb: '賠了夫人又折兵', character: '孫權', allusion: '周瑜設下「美人計」，假意將孫權的妹妹嫁給劉備，想藉機扣押劉備。不料被諸葛亮識破，結果劉備真的娶了孫夫人，又安全返回荊州。' },
+                { proverb: '子龍救主', character: '趙雲', allusion: '在長坂坡之戰中，趙雲為尋找失散的甘夫人與幼主劉禪，單槍匹馬殺入曹軍重圍，最終成功救出幼主。' },
+            ];
+
+            const mainContent = document.getElementById('main-content');
+            const proverbContainer = document.getElementById('proverb-container');
+            const characterContainer = document.getElementById('character-container');
+            const scoreElement = document.getElementById('score');
+            
+            const startGameModal = document.getElementById('start-game-modal');
+            const startGameButton = document.getElementById('start-game-button');
+            const startPlayerNameInput = document.getElementById('start-player-name');
+            const startStatus = document.getElementById('start-status');
+
+            const endGameModal = document.getElementById('end-game-modal');
+            const finalScoreElement = document.getElementById('final-score');
+            const restartButton = document.getElementById('restart-button');
+            const saveScoreButton = document.getElementById('save-score-button');
+            const playerNameInput = document.getElementById('player-name');
+            const saveStatus = document.getElementById('save-status');
+
+            const allusionModal = document.getElementById('allusion-modal');
+            const allusionTitle = document.getElementById('allusion-title');
+            const allusionResult = document.getElementById('allusion-result');
+            const allusionText = document.getElementById('allusion-text');
+            const nextQuestionButton = document.getElementById('next-question-button');
+
+            let score = 0;
+            let currentQuestion = null;
+            let remainingProverbs = [];
+            let playerName = '';
+
+            function shuffle(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+
+            function initGame() {
+                score = 0;
+                scoreElement.textContent = score;
+                remainingProverbs = shuffle([...idiomData]);
+                
+                endGameModal.classList.remove('modal-visible');
+                endGameModal.classList.add('modal-hidden');
+                
+                allusionModal.classList.remove('modal-visible');
+                allusionModal.classList.add('modal-hidden');
+
+                playerNameInput.value = '';
+                saveStatus.textContent = '';
+                saveScoreButton.disabled = false;
+                saveScoreButton.textContent = '儲存成績';
+                nextQuestion();
+            }
+
+            function nextQuestion() {
+                allusionModal.classList.remove('modal-visible');
+                allusionModal.classList.add('modal-hidden');
+
+                if (remainingProverbs.length === 0) {
+                    endGame();
+                    return;
+                }
+                currentQuestion = remainingProverbs.pop();
+                proverbContainer.innerHTML = '';
+                characterContainer.innerHTML = '';
+
+                const correctCharacter = currentQuestion.character;
+                const allCharacters = [...new Set(idiomData.map(p => p.character))];
+                const distractors = shuffle(allCharacters.filter(c => c !== correctCharacter)).slice(0, 3);
+                const options = shuffle([correctCharacter, ...distractors]);
+                
+                const proverbBox = document.createElement('div');
+                proverbBox.className = 'proverb-box flex justify-center items-center h-28 w-64 bg-[#EAE0D5] rounded-md text-center text-2xl font-bold p-4 border-2 border-dashed border-[#C6BBAE]';
+                proverbBox.dataset.character = currentQuestion.character;
+                proverbBox.textContent = currentQuestion.proverb;
+                addDropListeners(proverbBox);
+                proverbContainer.appendChild(proverbBox);
+
+                options.forEach(character => {
+                    const characterCard = document.createElement('div');
+                    characterCard.className = 'character-card bg-white cursor-grab rounded-md p-3 text-lg md:text-xl font-bold text-center w-24 h-16 flex justify-center items-center';
+                    characterCard.draggable = true;
+                    characterCard.dataset.character = character;
+                    characterCard.textContent = character;
+                    addDragListeners(characterCard);
+                    characterContainer.appendChild(characterCard);
+                });
+            }
+            
+            function showAllusion(isCorrect) {
+                const correctCharacter = currentQuestion.character;
+                allusionTitle.textContent = currentQuestion.proverb;
+                allusionText.textContent = currentQuestion.allusion;
+                if(isCorrect){
+                    allusionResult.textContent = '答對了！';
+                    allusionResult.className = 'text-lg mb-4 font-bold text-green-600';
+                } else {
+                    allusionResult.textContent = `答錯了！正確答案是：${correctCharacter}`;
+                    allusionResult.className = 'text-lg mb-4 font-bold text-red-600';
+                }
+                allusionModal.classList.remove('modal-hidden');
+                allusionModal.classList.add('modal-visible');
+            }
+
+            function endGame() {
+                mainContent.classList.add('hidden'); // 隱藏遊戲區
+                finalScoreElement.textContent = score;
+                playerNameInput.value = playerName;
+                endGameModal.classList.remove('modal-hidden');
+                endGameModal.classList.add('modal-visible');
+            }
+            
+            async function recordScore() {
+                const nameToSave = playerNameInput.value.trim();
+                if (!nameToSave) { saveStatus.textContent = '請先輸入你的名字！'; return; }
+                if (APPS_SCRIPT_URL === 'YOUR_WEB_APP_URL_HERE' || !APPS_SCRIPT_URL) {
+                    saveStatus.textContent = '後端URL未設定，無法儲存。';
+                    console.error("請在 JS 程式碼中設定 APPS_SCRIPT_URL");
+                    return;
+                }
+                saveScoreButton.disabled = true;
+                saveScoreButton.textContent = '儲存中...';
+                try {
+                    await fetch(APPS_SCRIPT_URL, {
+                        method: 'POST', mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: nameToSave, score: score, date: new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) })
+                    });
+                    saveScoreButton.textContent = '儲存成功！';
+                    saveStatus.textContent = '成績已紀錄至 Google Sheet。';
+                } catch (error) {
+                    console.error("儲存成績時發生錯誤:", error);
+                    saveScoreButton.textContent = '儲存失敗';
+                    saveStatus.textContent = '儲存失敗，請檢查網路或URL設定。';
+                    saveScoreButton.disabled = false;
+                }
+            }
+
+            function addDragListeners(element) {
+                element.addEventListener('dragstart', e => {
+                    e.target.classList.add('dragging');
+                    e.dataTransfer.setData('text/plain', e.target.dataset.character);
+                });
+                element.addEventListener('dragend', e => e.target.classList.remove('dragging'));
+            }
+
+            function addDropListeners(element) {
+                element.addEventListener('dragover', e => {
+                    e.preventDefault();
+                    if (!e.target.classList.contains('correct')) e.target.style.backgroundColor = '#DCD2C5';
+                });
+                element.addEventListener('dragleave', e => {
+                    if (!e.target.classList.contains('correct')) e.target.style.backgroundColor = '#EAE0D5';
+                });
+                element.addEventListener('drop', handleDrop);
+            }
+
+            function handleDrop(e) {
+                e.preventDefault();
+                const proverbBox = e.target.closest('.proverb-box');
+                if (!proverbBox || proverbBox.dataset.answered) return;
+
+                proverbBox.style.backgroundColor = '#EAE0D5';
+                proverbBox.dataset.answered = 'true';
+                const droppedCharacter = e.dataTransfer.getData('text/plain');
+                const correctCharacter = proverbBox.dataset.character;
+                const draggedElement = document.querySelector(`.character-card[data-character="${droppedCharacter}"]`);
+
+                if (droppedCharacter === correctCharacter) {
+                    score += 10;
+                    proverbBox.classList.add('correct');
+                    proverbBox.textContent = `${proverbBox.textContent}\n— ${correctCharacter}`;
+                    setTimeout(() => showAllusion(true), 300);
+                } else {
+                    score -= 5;
+                    if(draggedElement) draggedElement.classList.add('incorrect-shake');
+                    setTimeout(() => {
+                        if(draggedElement) draggedElement.classList.remove('incorrect-shake');
+                        showAllusion(false);
+                    }, 500);
+                }
+                scoreElement.textContent = score;
+            }
+            
+            // --- 事件綁定 ---
+            startGameButton.addEventListener('click', () => {
+                const name = startPlayerNameInput.value.trim();
+                if (name) {
+                    playerName = name;
+                    startGameModal.style.display = 'none'; // 直接修改style來隱藏
+                    mainContent.classList.remove('hidden'); // 顯示遊戲區
+                    initGame(); // 開始遊戲
+                } else {
+                    startStatus.textContent = '請先輸入您的大名！';
+                }
+            });
+
+            restartButton.addEventListener('click', () => {
+                endGameModal.classList.remove('modal-visible');
+                endGameModal.classList.add('modal-hidden');
+                startGameModal.style.display = 'flex'; // 直接修改style來顯示
+                startStatus.textContent = '';
+            });
+            
+            saveScoreButton.addEventListener('click', recordScore);
+            nextQuestionButton.addEventListener('click', nextQuestion);
+
+        });
+    </script>
+</body>
+</html>
+
